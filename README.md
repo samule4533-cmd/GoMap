@@ -1,17 +1,64 @@
-# gomap
+# GoMap
 
-A new Flutter project.
+지도 기반 장소 저장 앱.
 
-## Getting Started
+## 스택
 
-This project is a starting point for a Flutter application.
+- **Flutter** + **Riverpod**
+- **Mapbox** — 지도
+- **Naver Local Search** — 검색
+- **Supabase** — 인증 / DB
 
-A few resources to get you started if this is your first Flutter project:
+## 폴더 구조
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```
+lib/
+├── core/         상수, 테마, 유틸
+├── models/       Place, SavedPlace, PlaceVisibility, NaverPlace
+├── services/     Mapbox, Naver, Supabase
+├── features/
+│   ├── map/      지도 화면
+│   ├── place/    검색 / 저장
+│   └── auth/     로그인
+└── main.dart
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 실행
+
+```bash
+cp .env.example .env   # 키 입력
+flutter pub get
+flutter run \
+  --dart-define=MAPBOX_TOKEN=$MAPBOX_TOKEN \
+  --dart-define=NAVER_CLIENT_ID=$NAVER_CLIENT_ID \
+  --dart-define=NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET \
+  --dart-define=SUPABASE_URL=$SUPABASE_URL \
+  --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+```
+
+
+## DB 스키마 (Supabase)
+
+```sql
+create table places (
+  id uuid primary key default gen_random_uuid(),
+  provider text not null,
+  provider_key text not null,
+  name text not null,
+  address text,
+  lat double precision not null,
+  lng double precision not null,
+  category text,
+  created_at timestamptz default now(),
+  unique (provider, provider_key)
+);
+
+create table saved_places (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade,
+  place_id uuid references places(id) on delete cascade,
+  memo text,
+  visibility text not null default 'private',
+  created_at timestamptz default now()
+);
+```
