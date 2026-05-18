@@ -8,7 +8,12 @@ import '../models/saved_place.dart';
 
 class SupabaseService {
   static Future<void> init() async {
-    if (ApiKeys.supabaseUrl.isEmpty) return;
+    if (ApiKeys.supabaseUrl.isEmpty || ApiKeys.supabaseAnonKey.isEmpty) {
+      throw StateError(
+        'SUPABASE_URL / SUPABASE_ANON_KEY 가 비어있습니다. '
+        '.env 에 값을 넣고 `flutter run --dart-define-from-file=.env` 로 실행하세요.',
+      );
+    }
     await Supabase.initialize(
       url: ApiKeys.supabaseUrl,
       anonKey: ApiKeys.supabaseAnonKey,
