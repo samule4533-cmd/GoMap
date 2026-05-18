@@ -21,14 +21,14 @@ class SavedPlace {
   });
 
   factory SavedPlace.fromJson(Map<String, dynamic> json) => SavedPlace(
-        id: json['id'] as String,
-        userId: json['user_id'] as String,
-        placeId: json['place_id'] as String,
-        memo: json['memo'] as String?,
-        visibility: PlaceVisibility.fromDb(json['visibility'] as String),
-        createdAt: DateTime.parse(json['created_at'] as String),
-        place: json['place'] is Map<String, dynamic>
-            ? Place.fromJson(json['place'] as Map<String, dynamic>)
-            : null,
-      );
+    id: json['id'] as String,
+    userId: json['user_id'] as String,
+    placeId: json['place_id'] as String,
+    memo: json['memo'] as String?,
+    visibility: PlaceVisibility.fromDb(json['visibility'] as String),
+    createdAt: DateTime.parse(json['created_at'] as String),
+    place: json['place'] is Map<String, dynamic>
+        ? Place.fromJson(json['place'] as Map<String, dynamic>)
+        : null,
+  );
 }

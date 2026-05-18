@@ -8,10 +8,7 @@ class LoginScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       body: Center(
-        child: FilledButton(
-          onPressed: () {},
-          child: const Text('Google로 로그인'),
-        ),
+        child: FilledButton(onPressed: () {}, child: const Text('Google로 로그인')),
       ),
     );
   }

@@ -20,15 +20,15 @@ class Place {
   });
 
   factory Place.fromJson(Map<String, dynamic> json) => Place(
-        id: json['id'] as String,
-        provider: json['provider'] as String,
-        providerKey: json['provider_key'] as String,
-        name: json['name'] as String,
-        address: json['address'] as String?,
-        lat: (json['lat'] as num).toDouble(),
-        lng: (json['lng'] as num).toDouble(),
-        category: json['category'] as String?,
-      );
+    id: json['id'] as String,
+    provider: json['provider'] as String,
+    providerKey: json['provider_key'] as String,
+    name: json['name'] as String,
+    address: json['address'] as String?,
+    lat: (json['lat'] as num).toDouble(),
+    lng: (json['lng'] as num).toDouble(),
+    category: json['category'] as String?,
+  );
 
   static String buildProviderKey({
     required String provider,

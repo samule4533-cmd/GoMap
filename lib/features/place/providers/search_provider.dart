@@ -2,8 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../models/naver_place.dart';
 import '../../../services/naver_search_service.dart';
 
-final naverSearchServiceProvider =
-    Provider<NaverSearchService>((ref) => NaverSearchService());
+final naverSearchServiceProvider = Provider<NaverSearchService>(
+  (ref) => NaverSearchService(),
+);
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 

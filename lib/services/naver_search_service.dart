@@ -5,18 +5,17 @@ import '../models/naver_place.dart';
 
 class NaverSearchService {
   Future<List<NaverPlace>> search(String query, {int display = 10}) async {
-    final uri = Uri.https(
-      'openapi.naver.com',
-      '/v1/search/local.json',
-      {
-        'query': query,
-        'display': display.toString(),
+    final uri = Uri.https('openapi.naver.com', '/v1/search/local.json', {
+      'query': query,
+      'display': display.toString(),
+    });
+    final res = await http.get(
+      uri,
+      headers: {
+        'X-Naver-Client-Id': ApiKeys.naverClientId,
+        'X-Naver-Client-Secret': ApiKeys.naverClientSecret,
       },
     );
-    final res = await http.get(uri, headers: {
-      'X-Naver-Client-Id': ApiKeys.naverClientId,
-      'X-Naver-Client-Secret': ApiKeys.naverClientSecret,
-    });
 
     if (res.statusCode != 200) {
       throw Exception('Naver search failed: ${res.statusCode}');

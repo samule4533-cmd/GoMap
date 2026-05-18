@@ -9,7 +9,7 @@ enum PlaceVisibility {
   final String dbValue;
 
   static PlaceVisibility fromDb(String value) => values.firstWhere(
-        (v) => v.dbValue == value,
-        orElse: () => PlaceVisibility.private,
-      );
+    (v) => v.dbValue == value,
+    orElse: () => PlaceVisibility.private,
+  );
 }

@@ -21,10 +21,7 @@ class PlaceBottomSheet extends StatelessWidget {
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
-                onPressed: () {},
-                child: const Text('저장'),
-              ),
+              child: FilledButton(onPressed: () {}, child: const Text('저장')),
             ),
           ],
         ),
