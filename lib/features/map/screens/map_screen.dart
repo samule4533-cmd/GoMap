@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
-import '../../../models/naver_place.dart';
+import '../../../models/kakao_place.dart';
+import '../../../services/supabase_service.dart';
 import '../../place/widgets/place_bottom_sheet.dart';
 import '../../place/widgets/search_overlay.dart';
 import '../providers/map_provider.dart';
@@ -30,15 +31,56 @@ class MapScreen extends ConsumerWidget {
               ),
             ),
           ),
+          Positioned(
+            right: 16,
+            bottom: 24,
+            child: SafeArea(
+              child: FloatingActionButton.small(
+                heroTag: 'logout',
+                onPressed: () => _confirmLogout(context),
+                child: const Icon(Icons.logout),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  Future<void> _confirmLogout(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('로그아웃'),
+        content: const Text('로그아웃하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('로그아웃'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await SupabaseService.signOut();
+      // 세션 종료 시 authStateProvider 가 변화를 받아 AuthGate 가 로그인 화면으로 전환.
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('로그아웃 실패: $e')));
+    }
+  }
+
   Future<void> _focusPlace(
     BuildContext context,
     WidgetRef ref,
-    NaverPlace place,
+    KakaoPlace place,
   ) async {
     FocusScope.of(context).unfocus();
 
@@ -76,7 +118,7 @@ class MapScreen extends ConsumerWidget {
     _showSheet(context, place);
   }
 
-  void _showSheet(BuildContext context, NaverPlace place) {
+  void _showSheet(BuildContext context, KakaoPlace place) {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
