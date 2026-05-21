@@ -3,19 +3,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../services/supabase_service.dart';
-import 'signup_screen.dart';
+import 'otp_verify_screen.dart';
 
-class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends ConsumerStatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  ConsumerState<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _passwordConfirmController = TextEditingController();
 
   bool _submitting = false;
   String? _errorText;
@@ -24,6 +25,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordConfirmController.dispose();
     super.dispose();
   }
 
@@ -35,32 +37,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _errorText = null;
     });
 
+    final email = _emailController.text.trim();
+
     try {
-      await SupabaseService.signInWithPassword(
-        email: _emailController.text.trim(),
+      await SupabaseService.signUpWithEmail(
+        email: email,
         password: _passwordController.text,
       );
-      // 성공 시 authStateProvider 가 세션 변화를 받아 AuthGate 가 자동 전환.
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => OtpVerifyScreen(email: email)),
+      );
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _errorText = e.message);
     } catch (e) {
       if (!mounted) return;
-      setState(() => _errorText = '로그인 중 오류가 발생했습니다.');
+      setState(() => _errorText = '회원가입 중 오류가 발생했습니다.');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
   }
 
-  void _goToSignup() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute(builder: (_) => const SignupScreen()));
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('회원가입')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -72,15 +74,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      'GoMap',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
                     TextFormField(
                       controller: _emailController,
                       decoration: const InputDecoration(
@@ -101,13 +94,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     TextFormField(
                       controller: _passwordController,
                       decoration: const InputDecoration(
-                        labelText: '비밀번호',
+                        labelText: '비밀번호 (6자 이상)',
                         border: OutlineInputBorder(),
                       ),
                       obscureText: true,
-                      autofillHints: const [AutofillHints.password],
+                      autofillHints: const [AutofillHints.newPassword],
                       validator: (v) {
                         if (v == null || v.isEmpty) return '비밀번호를 입력하세요';
+                        if (v.length < 6) return '6자 이상이어야 합니다';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _passwordConfirmController,
+                      decoration: const InputDecoration(
+                        labelText: '비밀번호 확인',
+                        border: OutlineInputBorder(),
+                      ),
+                      obscureText: true,
+                      validator: (v) {
+                        if (v != _passwordController.text) {
+                          return '비밀번호가 일치하지 않습니다';
+                        }
                         return null;
                       },
                     ),
@@ -127,12 +136,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text('로그인'),
+                          : const Text('인증 코드 받기'),
                     ),
                     const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: _submitting ? null : _goToSignup,
-                      child: const Text('계정이 없으신가요? 회원가입'),
+                    const Text(
+                      '입력하신 이메일로 6자리 인증 코드가 발송됩니다.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                   ],
                 ),
