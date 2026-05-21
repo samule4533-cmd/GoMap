@@ -29,15 +29,4 @@ class Place {
     lng: (json['lng'] as num).toDouble(),
     category: json['category'] as String?,
   );
-
-  static String buildProviderKey({
-    required String provider,
-    required String name,
-    required double lat,
-    required double lng,
-  }) {
-    final latKey = (lat * 1e5).round();
-    final lngKey = (lng * 1e5).round();
-    return '$provider:$name:$latKey:$lngKey';
-  }
 }
