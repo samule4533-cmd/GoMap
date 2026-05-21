@@ -6,16 +6,16 @@
 
 - **Flutter** + **Riverpod**
 - **Mapbox** — 지도
-- **Naver Local Search** — 검색
+- **Kakao Local Search** — 장소 검색
 - **Supabase** — 인증 / DB
 
 ## 폴더 구조
 
 ```
 lib/
-├── core/         상수, 테마, 유틸
-├── models/       Place, SavedPlace, PlaceVisibility, NaverPlace
-├── services/     Mapbox, Naver, Supabase
+├── core/         상수, 테마
+├── models/       Place, SavedPlace, PlaceVisibility, KakaoPlace
+├── services/     Mapbox, Kakao, Supabase, Location
 ├── features/
 │   ├── map/      지도 화면
 │   ├── place/    검색 / 저장
@@ -28,14 +28,8 @@ lib/
 ```bash
 cp .env.example .env   # 키 입력
 flutter pub get
-flutter run \
-  --dart-define=MAPBOX_TOKEN=$MAPBOX_TOKEN \
-  --dart-define=NAVER_CLIENT_ID=$NAVER_CLIENT_ID \
-  --dart-define=NAVER_CLIENT_SECRET=$NAVER_CLIENT_SECRET \
-  --dart-define=SUPABASE_URL=$SUPABASE_URL \
-  --dart-define=SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+flutter run --dart-define-from-file=.env
 ```
-
 
 ## DB 스키마 (Supabase)
 
