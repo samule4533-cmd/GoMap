@@ -1,8 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants/api_keys.dart';
-import '../models/naver_place.dart';
-import '../models/place.dart';
+import '../models/kakao_place.dart';
 import '../models/place_visibility.dart';
 import '../models/saved_place.dart';
 
@@ -22,6 +21,35 @@ class SupabaseService {
 
   static SupabaseClient get client => Supabase.instance.client;
 
+  static GoTrueClient get auth => Supabase.instance.client.auth;
+
+  static Future<AuthResponse> signUpWithEmail({
+    required String email,
+    required String password,
+  }) {
+    return auth.signUp(email: email, password: password);
+  }
+
+  static Future<AuthResponse> verifySignupOtp({
+    required String email,
+    required String token,
+  }) {
+    return auth.verifyOTP(email: email, token: token, type: OtpType.signup);
+  }
+
+  static Future<void> resendSignupOtp({required String email}) {
+    return auth.resend(type: OtpType.signup, email: email);
+  }
+
+  static Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  }) {
+    return auth.signInWithPassword(email: email, password: password);
+  }
+
+  static Future<void> signOut() => auth.signOut();
+
   Future<List<SavedPlace>> fetchMySavedPlaces() async {
     final userId = client.auth.currentUser?.id;
     if (userId == null) return [];
@@ -38,8 +66,8 @@ class SupabaseService {
         .toList();
   }
 
-  Future<void> saveFromNaver({
-    required NaverPlace naverPlace,
+  Future<void> saveFromKakao({
+    required KakaoPlace kakaoPlace,
     String? memo,
     PlaceVisibility visibility = PlaceVisibility.private,
   }) async {
@@ -49,18 +77,13 @@ class SupabaseService {
     final placeRow = await client
         .from('places')
         .upsert({
-          'provider': 'naver',
-          'provider_key': Place.buildProviderKey(
-            provider: 'naver',
-            name: naverPlace.title,
-            lat: naverPlace.lat,
-            lng: naverPlace.lng,
-          ),
-          'name': naverPlace.title,
-          'address': naverPlace.address,
-          'lat': naverPlace.lat,
-          'lng': naverPlace.lng,
-          'category': naverPlace.category,
+          'provider': 'kakao',
+          'provider_key': kakaoPlace.id,
+          'name': kakaoPlace.title,
+          'address': kakaoPlace.roadAddress ?? kakaoPlace.address,
+          'lat': kakaoPlace.lat,
+          'lng': kakaoPlace.lng,
+          'category': kakaoPlace.category,
         }, onConflict: 'provider,provider_key')
         .select()
         .single();
