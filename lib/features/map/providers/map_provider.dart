@@ -14,3 +14,5 @@ final circleAnnotationManagerProvider = StateProvider<CircleAnnotationManager?>(
 );
 
 final selectedPlaceProvider = StateProvider<KakaoPlace?>((ref) => null);
+
+final is3dProvider = StateProvider<bool>((ref) => false);

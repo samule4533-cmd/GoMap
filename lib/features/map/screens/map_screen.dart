@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../models/kakao_place.dart';
+import '../../../services/location_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../place/widgets/place_bottom_sheet.dart';
 import '../../place/widgets/search_overlay.dart';
@@ -14,6 +15,7 @@ class MapScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final is3d = ref.watch(is3dProvider);
     return Scaffold(
       body: Stack(
         children: [
@@ -35,15 +37,84 @@ class MapScreen extends ConsumerWidget {
             right: 16,
             bottom: 24,
             child: SafeArea(
-              child: FloatingActionButton.small(
-                heroTag: 'logout',
-                onPressed: () => _confirmLogout(context),
-                child: const Icon(Icons.logout),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  FloatingActionButton.small(
+                    heroTag: 'myLocation',
+                    onPressed: () => _moveToMyLocation(context, ref),
+                    tooltip: '내 위치',
+                    child: const Icon(Icons.my_location),
+                  ),
+                  const SizedBox(height: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'toggle3d',
+                    onPressed: () => _toggle3d(ref),
+                    tooltip: is3d ? '2D로 보기' : '3D로 보기',
+                    child: Text(
+                      is3d ? '2D' : '3D',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FloatingActionButton.small(
+                    heroTag: 'logout',
+                    onPressed: () => _confirmLogout(context),
+                    child: const Icon(Icons.logout),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Future<void> _moveToMyLocation(BuildContext context, WidgetRef ref) async {
+    final coord = await LocationService.getCurrentPosition();
+    if (coord == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('위치를 가져올 수 없습니다. 권한과 위치 서비스를 확인해주세요.')),
+      );
+      return;
+    }
+    final mapboxMap = ref.read(mapboxMapProvider);
+    if (mapboxMap == null) return;
+
+    await mapboxMap.location.updateSettings(
+      LocationComponentSettings(enabled: true, pulsingEnabled: true),
+    );
+    final is3d = ref.read(is3dProvider);
+    await mapboxMap.flyTo(
+      CameraOptions(
+        center: Point(coordinates: Position(coord.lng, coord.lat)),
+        zoom: 16.0,
+        pitch: is3d ? 60.0 : 0.0,
+      ),
+      MapAnimationOptions(duration: 800),
+    );
+  }
+
+  Future<void> _toggle3d(WidgetRef ref) async {
+    final mapboxMap = ref.read(mapboxMapProvider);
+    if (mapboxMap == null) return;
+    final next = !ref.read(is3dProvider);
+    ref.read(is3dProvider.notifier).state = next;
+
+    final camera = await mapboxMap.getCameraState();
+    await mapboxMap.flyTo(
+      CameraOptions(
+        center: camera.center,
+        zoom: next ? camera.zoom.clamp(15.0, 20.0) : camera.zoom,
+        pitch: next ? 60.0 : 0.0,
+        bearing: camera.bearing,
+      ),
+      MapAnimationOptions(duration: 600),
     );
   }
 
@@ -99,10 +170,12 @@ class MapScreen extends ConsumerWidget {
       ),
     );
 
+    final is3d = ref.read(is3dProvider);
     await mapboxMap.flyTo(
       CameraOptions(
         center: Point(coordinates: Position(place.lng, place.lat)),
         zoom: 16.0,
+        pitch: is3d ? 60.0 : 0.0,
       ),
       MapAnimationOptions(duration: 1000),
     );

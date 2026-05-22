@@ -30,7 +30,11 @@ class _MapViewState extends ConsumerState<MapView> {
 
   @override
   Widget build(BuildContext context) {
-    return MapWidget(viewport: _viewport, onMapCreated: _onMapCreated);
+    return MapWidget(
+      viewport: _viewport,
+      styleUri: MapboxStyles.STANDARD,
+      onMapCreated: _onMapCreated,
+    );
   }
 
   Future<void> _onMapCreated(MapboxMap mapboxMap) async {
