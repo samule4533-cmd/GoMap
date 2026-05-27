@@ -4,17 +4,31 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 import '../../../models/kakao_place.dart';
 import '../../../services/location_service.dart';
-import '../../../services/supabase_service.dart';
+import '../../auth/screens/profile_screen.dart';
 import '../../place/widgets/place_bottom_sheet.dart';
 import '../../place/widgets/search_overlay.dart';
 import '../providers/map_provider.dart';
 import '../widgets/map_view.dart';
 
-class MapScreen extends ConsumerWidget {
+class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MapScreen> createState() => _MapScreenState();
+}
+
+class _MapScreenState extends ConsumerState<MapScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 지도 진입 시 위치 권한 다이얼로그를 한 번 노출.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      LocationService.ensurePermission();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final is3d = ref.watch(is3dProvider);
     return Scaffold(
       body: Stack(
@@ -61,9 +75,10 @@ class MapScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   FloatingActionButton.small(
-                    heroTag: 'logout',
-                    onPressed: () => _confirmLogout(context),
-                    child: const Icon(Icons.logout),
+                    heroTag: 'profile',
+                    onPressed: () => _openProfile(context),
+                    tooltip: '내 프로필',
+                    child: const Icon(Icons.person),
                   ),
                 ],
               ),
@@ -118,34 +133,10 @@ class MapScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmLogout(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('로그아웃'),
-        content: const Text('로그아웃하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('로그아웃'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await SupabaseService.signOut();
-      // 세션 종료 시 authStateProvider 가 변화를 받아 AuthGate 가 로그인 화면으로 전환.
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('로그아웃 실패: $e')));
-    }
+  void _openProfile(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ProfileScreen()));
   }
 
   Future<void> _focusPlace(
