@@ -152,6 +152,37 @@ class _OtpVerifyScreenState extends ConsumerState<OtpVerifyScreen> {
                       onPressed: _resending ? null : _onResend,
                       child: Text(_resending ? '발송 중...' : '코드 다시 받기'),
                     ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '메일이 오지 않나요?',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '이미 가입된 계정일 수 있습니다.\n로그인을 시도해보세요.',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(
+                              context,
+                            ).popUntil((r) => r.isFirst),
+                            child: const Text('로그인 화면으로'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
