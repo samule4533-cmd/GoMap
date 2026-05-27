@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/api_keys.dart';
 import '../models/kakao_place.dart';
 import '../models/place_visibility.dart';
+import '../models/profile.dart';
 import '../models/saved_place.dart';
 
 class SupabaseService {
@@ -49,6 +50,54 @@ class SupabaseService {
   }
 
   static Future<void> signOut() => auth.signOut();
+
+  /// 현재 로그인된 사용자의 프로필. 없으면 null (= 신규 가입 직후).
+  static Future<Profile?> fetchMyProfile() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return null;
+    final data = await client
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle();
+    if (data == null) return null;
+    return Profile.fromJson(data);
+  }
+
+  /// 프로필 생성. (nickname, tag) 중복 시 PostgrestException(code 23505).
+  static Future<Profile> createMyProfile({
+    required String nickname,
+    required String tag,
+  }) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Not signed in');
+    final data = await client
+        .from('profiles')
+        .insert({'id': userId, 'nickname': nickname, 'tag': tag})
+        .select()
+        .single();
+    return Profile.fromJson(data);
+  }
+
+  /// 프로필 수정. (nickname, tag) 중복 시 PostgrestException(code 23505).
+  static Future<Profile> updateMyProfile({
+    required String nickname,
+    required String tag,
+  }) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) throw StateError('Not signed in');
+    final data = await client
+        .from('profiles')
+        .update({
+          'nickname': nickname,
+          'tag': tag,
+          'updated_at': DateTime.now().toIso8601String(),
+        })
+        .eq('id', userId)
+        .select()
+        .single();
+    return Profile.fromJson(data);
+  }
 
   Future<List<SavedPlace>> fetchMySavedPlaces() async {
     final userId = client.auth.currentUser?.id;
