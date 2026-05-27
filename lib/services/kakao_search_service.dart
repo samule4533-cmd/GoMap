@@ -15,6 +15,7 @@ class KakaoSearchService {
     if (lat != null && lng != null) {
       params['x'] = lng.toString();
       params['y'] = lat.toString();
+      params['sort'] = 'distance';
       if (radiusMeters != null) {
         params['radius'] = radiusMeters.toString();
       }
