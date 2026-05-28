@@ -3,6 +3,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/constants/api_keys.dart';
 import '../models/friend.dart';
 import '../models/friend_relation.dart';
+import '../models/group.dart';
+import '../models/group_member.dart';
 import '../models/kakao_place.dart';
 import '../models/place_visibility.dart';
 import '../models/profile.dart';
@@ -162,6 +164,96 @@ class SupabaseService {
             overrideRelation: FriendRelation.pendingReceived,
           ),
         )
+        .toList();
+  }
+
+  // ===== Groups =====
+
+  /// 그룹 생성. owner 는 자동 가입되고, member_user_ids 는 owner 의 accepted 친구여야 한다.
+  /// 친구가 아닌 id 가 들어가면 서버에서 raise.
+  static Future<String> createGroup({
+    required String name,
+    required List<String> memberUserIds,
+  }) async {
+    final data = await client.rpc(
+      'create_group',
+      params: {'group_name': name, 'member_user_ids': memberUserIds},
+    );
+    return data as String;
+  }
+
+  /// 멤버 추가 (owner only). 친구 관계 검증은 서버에서 한다.
+  static Future<void> addGroupMembers({
+    required String groupId,
+    required List<String> memberUserIds,
+  }) async {
+    await client.rpc(
+      'add_group_members',
+      params: {'target_group_id': groupId, 'member_user_ids': memberUserIds},
+    );
+  }
+
+  /// 멤버 강퇴 (owner only). owner 본인 제거는 RPC 가 거부한다 (leaveGroup 사용).
+  static Future<void> removeGroupMember({
+    required String groupId,
+    required String targetUserId,
+  }) async {
+    await client.rpc(
+      'remove_group_member',
+      params: {'target_group_id': groupId, 'target_user_id': targetUserId},
+    );
+  }
+
+  /// 그룹 나가기. owner 가 나가면 가장 오래된 멤버에게 자동 위임, 멤버가 본인뿐이면 그룹 삭제.
+  static Future<void> leaveGroup(String groupId) async {
+    await client.rpc('leave_group', params: {'target_group_id': groupId});
+  }
+
+  /// owner 가 명시적으로 위임. new_owner 는 이미 그룹 멤버여야 한다.
+  static Future<void> transferGroupOwnership({
+    required String groupId,
+    required String newOwnerId,
+  }) async {
+    await client.rpc(
+      'transfer_group_ownership',
+      params: {'target_group_id': groupId, 'new_owner_id': newOwnerId},
+    );
+  }
+
+  /// 그룹 삭제 (owner only).
+  static Future<void> deleteGroup(String groupId) async {
+    await client.rpc('delete_group', params: {'target_group_id': groupId});
+  }
+
+  /// 그룹 이름 변경 (owner only).
+  static Future<void> renameGroup({
+    required String groupId,
+    required String newName,
+  }) async {
+    await client.rpc(
+      'rename_group',
+      params: {'target_group_id': groupId, 'new_name': newName},
+    );
+  }
+
+  /// 내 그룹 목록 (owner / 일반 멤버 모두).
+  static Future<List<Group>> listMyGroups() async {
+    final data = await client.rpc('list_my_groups');
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(Group.fromJson)
+        .toList();
+  }
+
+  /// 그룹 멤버 목록. 호출자가 그룹 멤버일 때만 의미 있는 결과.
+  static Future<List<GroupMember>> listGroupMembers(String groupId) async {
+    final data = await client.rpc(
+      'list_group_members',
+      params: {'target_group_id': groupId},
+    );
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(GroupMember.fromJson)
         .toList();
   }
 
