@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../models/profile.dart';
 import '../../../services/supabase_service.dart';
+import '../../friends/screens/friends_screen.dart';
 import '../providers/profile_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -55,9 +56,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ).showSnackBar(const SnackBar(content: Text('프로필이 수정되었습니다')));
     } on PostgrestException catch (e) {
       if (!mounted) return;
-      final msg = e.code == '23505'
-          ? '이미 사용 중인 닉네임#태그 조합입니다'
-          : '수정 실패: ${e.message}';
+      final msg = switch (e.code) {
+        '23505' => '이미 사용 중인 닉네임#태그 조합입니다',
+        '23514' => '닉네임과 태그에는 공백 또는 # 를 사용할 수 없습니다',
+        _ => '수정 실패: ${e.message}',
+      };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     } catch (e) {
       if (!mounted) return;
@@ -103,7 +106,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return '닉네임을 입력해주세요';
     if (v.length > 20) return '닉네임은 20자 이하';
-    if (v.contains('#')) return '닉네임에 # 는 사용할 수 없습니다';
+    if (RegExp(r'[#\s]').hasMatch(v)) {
+      return '닉네임에 공백과 # 는 사용할 수 없습니다';
+    }
     return null;
   }
 
@@ -111,7 +116,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final v = value?.trim() ?? '';
     if (v.length < 2) return '태그는 2자 이상';
     if (v.length > 20) return '태그는 20자 이하';
-    if (v.contains('#')) return '태그에 # 는 사용할 수 없습니다';
+    if (RegExp(r'[#\s]').hasMatch(v)) {
+      return '태그에 공백과 # 는 사용할 수 없습니다';
+    }
     return null;
   }
 
@@ -199,7 +206,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         icon: const Icon(Icons.edit),
                         label: const Text('프로필 수정'),
                       ),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.people_outline),
+                      title: const Text('친구 관리'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _editing
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const FriendsScreen(),
+                              ),
+                            ),
+                    ),
                     const Divider(),
                     const SizedBox(height: 16),
                     TextButton.icon(
