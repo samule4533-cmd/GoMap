@@ -13,6 +13,7 @@ class FriendsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final friendsAsync = ref.watch(friendsListProvider);
+    final pendingAsync = ref.watch(pendingRequestsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -25,54 +26,73 @@ class FriendsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: friendsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('친구 목록을 불러올 수 없습니다: $e')),
-        data: (friends) {
-          if (friends.isEmpty) return _buildEmpty(context);
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(friendsListProvider),
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: friends.length,
-              separatorBuilder: (_, _) => const Divider(height: 1),
-              itemBuilder: (context, i) =>
-                  _FriendTile(friend: friends[i], ref: ref),
-            ),
-          );
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(friendsListProvider);
+          ref.invalidate(pendingRequestsProvider);
         },
+        child: friendsAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('친구 목록을 불러올 수 없습니다: $e')),
+          data: (friends) {
+            final pending = pendingAsync.maybeWhen(
+              data: (list) => list,
+              orElse: () => const <Friend>[],
+            );
+            if (friends.isEmpty && pending.isEmpty) {
+              return ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [_buildEmpty(context)],
+              );
+            }
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                if (pending.isNotEmpty) ...[
+                  _SectionHeader(title: '받은 친구 요청 ${pending.length}개'),
+                  for (final f in pending)
+                    _PendingRequestTile(friend: f, ref: ref),
+                  const Divider(height: 24),
+                ],
+                if (friends.isNotEmpty) ...[
+                  _SectionHeader(title: '친구 ${friends.length}명'),
+                  for (final f in friends) _FriendTile(friend: f, ref: ref),
+                ],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildEmpty(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.people_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 16),
-            Text('아직 친구가 없습니다', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 4),
-            Text(
-              '닉네임#태그로 친구를 검색해 추가해보세요.',
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => _openSearch(context),
-              icon: const Icon(Icons.person_add),
-              label: const Text('친구 추가하기'),
-            ),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 80),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.people_outline,
+            size: 64,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 16),
+          Text('아직 친구가 없습니다', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            '닉네임#태그로 친구를 검색해 추가해보세요.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: () => _openSearch(context),
+            icon: const Icon(Icons.person_add),
+            label: const Text('친구 추가하기'),
+          ),
+        ],
       ),
     );
   }
@@ -81,6 +101,88 @@ class FriendsScreen extends ConsumerWidget {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const FriendSearchScreen()));
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingRequestTile extends StatelessWidget {
+  const _PendingRequestTile({required this.friend, required this.ref});
+
+  final Friend friend;
+  final WidgetRef ref;
+
+  Future<void> _accept(BuildContext context) async {
+    try {
+      await SupabaseService.acceptFriendRequest(friend.id);
+      ref.invalidate(friendsListProvider);
+      ref.invalidate(pendingRequestsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${friend.handle} 님과 친구가 되었습니다')));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('수락 실패: $e')));
+    }
+  }
+
+  Future<void> _reject(BuildContext context) async {
+    try {
+      await SupabaseService.removeFriend(friend.id);
+      ref.invalidate(pendingRequestsProvider);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('요청을 거절했습니다')));
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('거절 실패: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: CircleAvatar(child: Text(friend.nickname.characters.first)),
+      title: Text(friend.nickname),
+      subtitle: Text('#${friend.tag}'),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextButton(
+            onPressed: () => _reject(context),
+            child: const Text('거절'),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            onPressed: () => _accept(context),
+            child: const Text('수락'),
+          ),
+        ],
+      ),
+    );
   }
 }
 

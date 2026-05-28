@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants/api_keys.dart';
 import '../models/friend.dart';
+import '../models/friend_relation.dart';
 import '../models/kakao_place.dart';
 import '../models/place_visibility.dart';
 import '../models/profile.dart';
@@ -36,7 +37,10 @@ class SupabaseService {
     required String email,
     required String token,
   }) {
-    return auth.verifyOTP(email: email, token: token, type: OtpType.signup);
+    // supabase_flutter 2.x 의 기본 auth flow 는 PKCE. PKCE 흐름에서 6자리 OTP
+    // 검증은 OtpType.email 로 받는다. OtpType.signup 은 implicit flow 잔재라
+    // PKCE 환경에서는 'token expired or invalid' 로 떨어진다.
+    return auth.verifyOTP(email: email, token: token, type: OtpType.email);
   }
 
   static Future<void> resendSignupOtp({required String email}) {
@@ -113,22 +117,51 @@ class SupabaseService {
     return Friend.fromJson(list.first);
   }
 
-  /// 친구 추가 (양방향). 본인 추가/이미 친구 시 RPC 가 처리.
-  static Future<void> addFriend(String targetUserId) async {
-    await client.rpc('add_friend', params: {'target_user_id': targetUserId});
+  /// 친구 요청 보내기. 양쪽 row 가 pending 으로 생성된다.
+  /// 이미 관계가 있으면 RPC 가 조용히 무시.
+  static Future<void> requestFriend(String targetUserId) async {
+    await client.rpc(
+      'request_friend',
+      params: {'target_user_id': targetUserId},
+    );
   }
 
-  /// 친구 삭제 (양방향).
+  /// 받은 친구 요청 수락. requester 가 보낸 pending 만 수락 가능.
+  static Future<void> acceptFriendRequest(String requesterUserId) async {
+    await client.rpc(
+      'accept_friend_request',
+      params: {'requester_user_id': requesterUserId},
+    );
+  }
+
+  /// 양방향 friendship 삭제. 보낸 요청 취소, 받은 요청 거절, 친구 해제 공통.
   static Future<void> removeFriend(String targetUserId) async {
     await client.rpc('remove_friend', params: {'target_user_id': targetUserId});
   }
 
-  /// 내 친구 목록 (가입일 내림차순).
+  /// 내 친구 목록 (accepted only, 생성일 내림차순).
   static Future<List<Friend>> listMyFriends() async {
     final data = await client.rpc('list_my_friends');
     return (data as List)
         .cast<Map<String, dynamic>>()
-        .map(Friend.fromJson)
+        .map(
+          (json) =>
+              Friend.fromJson(json, overrideRelation: FriendRelation.accepted),
+        )
+        .toList();
+  }
+
+  /// 내가 받은 친구 요청 목록 (pending only).
+  static Future<List<Friend>> listMyPendingRequests() async {
+    final data = await client.rpc('list_my_pending_requests');
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(
+          (json) => Friend.fromJson(
+            json,
+            overrideRelation: FriendRelation.pendingReceived,
+          ),
+        )
         .toList();
   }
 

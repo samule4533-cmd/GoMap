@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/friend.dart';
+import '../../../models/friend_relation.dart';
 import '../../../services/supabase_service.dart';
 import '../providers/friends_provider.dart';
 
@@ -18,7 +19,7 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
   final _tagController = TextEditingController();
 
   bool _searching = false;
-  bool _adding = false;
+  bool _acting = false;
   Friend? _result;
   bool _searched = false;
 
@@ -38,6 +39,9 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
   String? _validateTag(String? value) {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return '태그를 입력해주세요';
+    if (!RegExp(r'^[가-힣A-Za-z0-9]+$').hasMatch(v)) {
+      return '태그는 한글, 영문, 숫자만 입력해주세요';
+    }
     return null;
   }
 
@@ -68,23 +72,61 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
     }
   }
 
-  Future<void> _addFriend(Friend friend) async {
-    setState(() => _adding = true);
+  /// 검색 결과 카드의 액션 버튼 처리. relation 별로 호출하는 RPC 가 다르다.
+  Future<void> _act(Friend friend) async {
+    setState(() => _acting = true);
     try {
-      await SupabaseService.addFriend(friend.id);
+      late final String message;
+      switch (friend.relation) {
+        case FriendRelation.none:
+          await SupabaseService.requestFriend(friend.id);
+          message = '${friend.handle} 님에게 친구 요청을 보냈습니다';
+        case FriendRelation.pendingSent:
+          await SupabaseService.removeFriend(friend.id);
+          message = '친구 요청을 취소했습니다';
+        case FriendRelation.pendingReceived:
+          await SupabaseService.acceptFriendRequest(friend.id);
+          message = '${friend.handle} 님과 친구가 되었습니다';
+        case FriendRelation.accepted:
+          return; // 버튼 비활성 상태라 여기 도달하지 않음
+      }
       ref.invalidate(friendsListProvider);
+      ref.invalidate(pendingRequestsProvider);
+      if (!mounted) return;
+      // 다시 검색해서 최신 relation 으로 갱신
+      await _search();
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('${friend.handle} 님을 친구로 추가했습니다')));
-      Navigator.of(context).pop();
+      ).showSnackBar(SnackBar(content: Text(message)));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('친구 추가 실패: $e')));
+      ).showSnackBar(SnackBar(content: Text('실패: $e')));
     } finally {
-      if (mounted) setState(() => _adding = false);
+      if (mounted) setState(() => _acting = false);
+    }
+  }
+
+  Future<void> _reject(Friend friend) async {
+    setState(() => _acting = true);
+    try {
+      await SupabaseService.removeFriend(friend.id);
+      ref.invalidate(pendingRequestsProvider);
+      if (!mounted) return;
+      await _search();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('요청을 거절했습니다')));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('실패: $e')));
+    } finally {
+      if (mounted) setState(() => _acting = false);
     }
   }
 
@@ -208,23 +250,50 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen> {
                 ],
               ),
             ),
-            FilledButton(
-              onPressed: (friend.isFriend || _adding)
-                  ? null
-                  : () => _addFriend(friend),
-              child: friend.isFriend
-                  ? const Text('이미 친구')
-                  : (_adding
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('친구 추가')),
-            ),
+            _buildActions(friend),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildActions(Friend friend) {
+    if (_acting) {
+      return const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+
+    switch (friend.relation) {
+      case FriendRelation.none:
+        return FilledButton(
+          onPressed: () => _act(friend),
+          child: const Text('친구 신청'),
+        );
+      case FriendRelation.pendingSent:
+        return OutlinedButton(
+          onPressed: () => _act(friend),
+          child: const Text('요청 취소'),
+        );
+      case FriendRelation.pendingReceived:
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextButton(
+              onPressed: () => _reject(friend),
+              child: const Text('거절'),
+            ),
+            const SizedBox(width: 4),
+            FilledButton(
+              onPressed: () => _act(friend),
+              child: const Text('수락'),
+            ),
+          ],
+        );
+      case FriendRelation.accepted:
+        return FilledButton(onPressed: null, child: const Text('이미 친구'));
+    }
   }
 }
