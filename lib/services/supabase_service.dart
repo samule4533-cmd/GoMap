@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants/api_keys.dart';
+import '../models/friend.dart';
 import '../models/kakao_place.dart';
 import '../models/place_visibility.dart';
 import '../models/profile.dart';
@@ -80,6 +81,7 @@ class SupabaseService {
   }
 
   /// 프로필 수정. (nickname, tag) 중복 시 PostgrestException(code 23505).
+  /// updated_at 은 DB 트리거가 자동 갱신하므로 보내지 않는다.
   static Future<Profile> updateMyProfile({
     required String nickname,
     required String tag,
@@ -88,15 +90,46 @@ class SupabaseService {
     if (userId == null) throw StateError('Not signed in');
     final data = await client
         .from('profiles')
-        .update({
-          'nickname': nickname,
-          'tag': tag,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
+        .update({'nickname': nickname, 'tag': tag})
         .eq('id', userId)
         .select()
         .single();
     return Profile.fromJson(data);
+  }
+
+  // ===== Friends =====
+
+  /// 핸들로 사용자 검색 (정확 매칭). 결과 없으면 null.
+  static Future<Friend?> searchProfileByHandle({
+    required String nickname,
+    required String tag,
+  }) async {
+    final data = await client.rpc(
+      'search_profile_by_handle',
+      params: {'search_nickname': nickname, 'search_tag': tag},
+    );
+    final list = (data as List).cast<Map<String, dynamic>>();
+    if (list.isEmpty) return null;
+    return Friend.fromJson(list.first);
+  }
+
+  /// 친구 추가 (양방향). 본인 추가/이미 친구 시 RPC 가 처리.
+  static Future<void> addFriend(String targetUserId) async {
+    await client.rpc('add_friend', params: {'target_user_id': targetUserId});
+  }
+
+  /// 친구 삭제 (양방향).
+  static Future<void> removeFriend(String targetUserId) async {
+    await client.rpc('remove_friend', params: {'target_user_id': targetUserId});
+  }
+
+  /// 내 친구 목록 (가입일 내림차순).
+  static Future<List<Friend>> listMyFriends() async {
+    final data = await client.rpc('list_my_friends');
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(Friend.fromJson)
+        .toList();
   }
 
   Future<List<SavedPlace>> fetchMySavedPlaces() async {
