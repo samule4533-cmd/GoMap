@@ -122,34 +122,32 @@ class GroupDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     Group group,
   ) async {
+    // controller 는 dialog 가 dispose 되는 다음 프레임까지 TextField 가
+    // 참조하므로, 여기서 명시적으로 dispose 하면 _dependents.isEmpty
+    // assertion 이 터진다. dialog 닫히면 GC 가 회수.
     final controller = TextEditingController(text: group.name);
-    final String? newName;
-    try {
-      newName = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('이름 변경'),
-          content: TextField(
-            controller: controller,
-            maxLength: 30,
-            decoration: const InputDecoration(labelText: '그룹 이름'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('취소'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(controller.text.trim()),
-              child: const Text('저장'),
-            ),
-          ],
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('이름 변경'),
+        content: TextField(
+          controller: controller,
+          maxLength: 30,
+          decoration: const InputDecoration(labelText: '그룹 이름'),
         ),
-      );
-    } finally {
-      controller.dispose();
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('취소'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(controller.text.trim()),
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
     if (newName == null || newName.isEmpty || newName == group.name) return;
     try {
       await SupabaseService.renameGroup(groupId: group.id, newName: newName);
