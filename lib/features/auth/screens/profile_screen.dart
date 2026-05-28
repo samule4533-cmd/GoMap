@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../models/profile.dart';
 import '../../../services/supabase_service.dart';
 import '../../friends/screens/friends_screen.dart';
+import '../../groups/screens/groups_screen.dart';
 import '../providers/profile_provider.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -218,6 +219,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           : () => Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (_) => const FriendsScreen(),
+                              ),
+                            ),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.groups_outlined),
+                      title: const Text('내 그룹'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: _editing
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const GroupsScreen(),
                               ),
                             ),
                     ),
