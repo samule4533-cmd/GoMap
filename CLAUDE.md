@@ -143,6 +143,10 @@ flutter run --dart-define-from-file=.env
 - 환경은 `local`, `dev/staging`, `production`을 분리한다.
 - production 데이터베이스를 직접 개발용으로 사용하지 않는다.
 - Naver API secret처럼 모바일 앱에 넣으면 안 되는 값은 장기적으로 Supabase Edge Function 같은 서버 측 코드에서만 사용한다.
+- local에서 마이그레이션 작성
+- supabase db reset / supabase migration up 등으로 local 검증
+- 앱도 local Supabase로 테스트
+- 출시 및 베포 단계에서만, remote dev/prod에 db push
 
 ## 작업 참고 사항
 
@@ -156,4 +160,3 @@ flutter run --dart-define-from-file=.env
 - API 키, 토큰, 로컬 경로, 개인 설정이 코드나 커밋 대상 파일에 들어가지 않았는지 항상 확인한다.
 - 사용자가 작성 중인 변경사항을 덮어쓰거나 되돌리지 않는다. 같은 파일을 수정해야 하면 기존 변경을 읽고 그 위에 맞춰 작업한다.
 - 디렉토리 구조는 각 역할에 맞게 분류한다. 그러나 너무 과도하게 나누지 않는다.
-
