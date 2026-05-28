@@ -58,7 +58,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       if (!mounted) return;
       final msg = switch (e.code) {
         '23505' => '이미 사용 중인 닉네임#태그 조합입니다',
-        '23514' => '닉네임과 태그에는 공백 또는 # 를 사용할 수 없습니다',
+        '23514' => '닉네임에는 공백/# 를, 태그에는 특수문자를 사용할 수 없습니다',
         _ => '수정 실패: ${e.message}',
       };
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
@@ -116,8 +116,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final v = value?.trim() ?? '';
     if (v.length < 2) return '태그는 2자 이상';
     if (v.length > 20) return '태그는 20자 이하';
-    if (RegExp(r'[#\s]').hasMatch(v)) {
-      return '태그에 공백과 # 는 사용할 수 없습니다';
+    if (!RegExp(r'^[가-힣A-Za-z0-9]+$').hasMatch(v)) {
+      return '태그는 한글, 영문, 숫자만 사용할 수 있습니다';
     }
     return null;
   }
