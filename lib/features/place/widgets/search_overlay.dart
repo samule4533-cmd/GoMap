@@ -16,8 +16,6 @@ class SearchOverlay extends ConsumerStatefulWidget {
 class _SearchOverlayState extends ConsumerState<SearchOverlay> {
   final _controller = TextEditingController();
   late final FocusNode _focusNode;
-  // 결과 탭 후 리스트만 접기. 검색어/캐시는 유지.
-  bool _listCollapsed = false;
 
   @override
   void initState() {
@@ -35,25 +33,26 @@ class _SearchOverlayState extends ConsumerState<SearchOverlay> {
 
   void _onFocusChange() {
     // 사용자가 검색바에 다시 포커스 → 리스트 복원
-    if (_focusNode.hasFocus && _listCollapsed) {
-      setState(() => _listCollapsed = false);
+    if (_focusNode.hasFocus) {
+      ref.read(searchListCollapsedProvider.notifier).state = false;
     }
   }
 
   void _clear() {
     _controller.clear();
     ref.read(searchQueryProvider.notifier).state = '';
-    setState(() => _listCollapsed = false);
+    ref.read(searchListCollapsedProvider.notifier).state = false;
   }
 
   void _handleTap(KakaoPlace place) {
     widget.onPlaceTap?.call(place);
-    setState(() => _listCollapsed = true);
+    ref.read(searchListCollapsedProvider.notifier).state = true;
   }
 
   @override
   Widget build(BuildContext context) {
     final results = ref.watch(searchResultsProvider);
+    final listCollapsed = ref.watch(searchListCollapsedProvider);
 
     return Column(
       children: [
@@ -80,19 +79,19 @@ class _SearchOverlayState extends ConsumerState<SearchOverlay> {
                     ),
             ),
             onSubmitted: (value) {
-              setState(() => _listCollapsed = false);
+              ref.read(searchListCollapsedProvider.notifier).state = false;
               ref.read(searchQueryProvider.notifier).state = value.trim();
             },
             onChanged: (_) {
-              if (_listCollapsed) {
-                setState(() => _listCollapsed = false);
-              } else {
-                setState(() {});
+              if (listCollapsed) {
+                ref.read(searchListCollapsedProvider.notifier).state = false;
               }
+              // suffixIcon(clear) 표시 토글 위해 강제 rebuild
+              setState(() {});
             },
           ),
         ),
-        if (!_listCollapsed)
+        if (!listCollapsed)
           results.when(
             data: (places) {
               if (places.isEmpty) return const SizedBox.shrink();

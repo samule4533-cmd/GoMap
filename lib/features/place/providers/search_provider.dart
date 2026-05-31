@@ -15,6 +15,11 @@ final currentLocationProvider = FutureProvider<({double lat, double lng})?>(
 
 final searchQueryProvider = StateProvider<String>((ref) => '');
 
+/// 결과 리스트를 접었는지 여부. 검색어/캐시는 유지하고 리스트만 숨긴다.
+/// - 결과 탭 / 외부(지도) 탭 → true
+/// - 검색바 재포커스 / 검색어 변경 → false
+final searchListCollapsedProvider = StateProvider<bool>((ref) => false);
+
 final searchResultsProvider = FutureProvider<List<KakaoPlace>>((ref) async {
   final query = ref.watch(searchQueryProvider);
   if (query.isEmpty) return [];

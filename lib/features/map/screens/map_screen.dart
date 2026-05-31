@@ -5,6 +5,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import '../../../models/kakao_place.dart';
 import '../../../services/location_service.dart';
 import '../../auth/screens/profile_screen.dart';
+import '../../place/providers/search_provider.dart';
 import '../../place/widgets/place_bottom_sheet.dart';
 import '../../place/widgets/search_overlay.dart';
 import '../providers/map_provider.dart';
@@ -30,10 +31,18 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   Widget build(BuildContext context) {
     final is3d = ref.watch(is3dProvider);
+    final showBackdrop = _shouldShowBackdrop(ref);
     return Scaffold(
       body: Stack(
         children: [
           MapView(onMarkerTap: () => _onMarkerTap(context, ref)),
+          if (showBackdrop)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => _dismissSearchList(context, ref),
+              ),
+            ),
           Positioned(
             top: 0,
             left: 0,
@@ -87,6 +96,23 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ],
       ),
     );
+  }
+
+  /// 결과 리스트가 펼쳐져 있고 결과가 1개 이상일 때만 backdrop 표시.
+  /// 그 외(검색 전, 결과 없음, 이미 접힘) 에는 지도 제스처를 차단할 이유 없음.
+  bool _shouldShowBackdrop(WidgetRef ref) {
+    final collapsed = ref.watch(searchListCollapsedProvider);
+    if (collapsed) return false;
+    final results = ref.watch(searchResultsProvider);
+    return results.maybeWhen(
+      data: (places) => places.isNotEmpty,
+      orElse: () => false,
+    );
+  }
+
+  void _dismissSearchList(BuildContext context, WidgetRef ref) {
+    FocusScope.of(context).unfocus();
+    ref.read(searchListCollapsedProvider.notifier).state = true;
   }
 
   Future<void> _moveToMyLocation(BuildContext context, WidgetRef ref) async {
