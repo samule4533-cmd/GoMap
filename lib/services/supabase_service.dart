@@ -1,6 +1,8 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/constants/api_keys.dart';
+import '../models/appointment.dart';
+import '../models/appointment_candidate.dart';
 import '../models/friend.dart';
 import '../models/friend_relation.dart';
 import '../models/group.dart';
@@ -281,7 +283,22 @@ class SupabaseService {
     final userId = client.auth.currentUser?.id;
     if (userId == null) throw StateError('Not signed in');
 
-    final placeRow = await client
+    final placeId = await upsertPlaceFromKakao(kakaoPlace);
+
+    await client.from('saved_places').insert({
+      'user_id': userId,
+      'place_id': placeId,
+      'memo': memo,
+      'visibility': visibility.dbValue,
+    });
+  }
+
+  // ===== Places (외부 provider upsert) =====
+
+  /// 카카오 검색 결과를 `places` 테이블에 upsert 하고 row id 를 반환.
+  /// 약속 후보 등록 / 즐겨찾기 저장 등에서 공용으로 쓴다.
+  static Future<String> upsertPlaceFromKakao(KakaoPlace kakaoPlace) async {
+    final row = await client
         .from('places')
         .upsert({
           'provider': 'kakao',
@@ -292,14 +309,104 @@ class SupabaseService {
           'lng': kakaoPlace.lng,
           'category': kakaoPlace.category,
         }, onConflict: 'provider,provider_key')
-        .select()
+        .select('id')
         .single();
+    return row['id'] as String;
+  }
 
-    await client.from('saved_places').insert({
-      'user_id': userId,
-      'place_id': placeRow['id'],
-      'memo': memo,
-      'visibility': visibility.dbValue,
-    });
+  // ===== Appointments =====
+
+  /// 약속 생성 (그룹 owner only). 후보 2~5개, deadline 미래.
+  /// 반환은 새 appointment_id.
+  static Future<String> createAppointment({
+    required String groupId,
+    String? memo,
+    required DateTime deadlineAt,
+    required List<String> placeIds,
+  }) async {
+    final data = await client.rpc(
+      'create_appointment',
+      params: {
+        'target_group_id': groupId,
+        'appointment_memo': memo,
+        'deadline_at': deadlineAt.toIso8601String(),
+        'place_ids': placeIds,
+      },
+    );
+    return data as String;
+  }
+
+  /// 투표 (그룹 멤버, 모임장 포함). upsert 라 후보 변경은 같은 RPC 재호출.
+  /// 마지막 멤버가 호출하면 서버에서 자동 마감 시도까지 처리된다.
+  static Future<void> castVote({
+    required String appointmentId,
+    required String candidateId,
+  }) async {
+    await client.rpc(
+      'cast_vote',
+      params: {
+        'target_appointment_id': appointmentId,
+        'target_candidate_id': candidateId,
+      },
+    );
+  }
+
+  /// 자동 마감 시도. 전원 투표 OR 시간 만료면 close (단일 winner→'closed', 동률→'tie').
+  /// 반환은 호출 후 상태 ('open' / 'tie' / 'closed'). 화면 진입 시 호출해서
+  /// 시간 만료 케이스를 lazy 하게 처리.
+  static Future<String> maybeCloseAppointment(String appointmentId) async {
+    final data = await client.rpc(
+      'maybe_close_appointment',
+      params: {'target_appointment_id': appointmentId},
+    );
+    return data as String;
+  }
+
+  /// 동률 해소 (group owner only). status='tie' 인 약속에 winner 후보를 지정.
+  static Future<void> resolveAppointmentTie({
+    required String appointmentId,
+    required String winningCandidateId,
+  }) async {
+    await client.rpc(
+      'resolve_appointment_tie',
+      params: {
+        'target_appointment_id': appointmentId,
+        'winning_candidate_id': winningCandidateId,
+      },
+    );
+  }
+
+  /// 약속 취소 / 삭제 (appointment owner only). cascade 로 후보/투표 함께 삭제.
+  static Future<void> cancelAppointment(String appointmentId) async {
+    await client.rpc(
+      'cancel_appointment',
+      params: {'target_appointment_id': appointmentId},
+    );
+  }
+
+  /// 그룹의 약속 목록 (메타). 호출자는 그룹 멤버여야 한다.
+  static Future<List<Appointment>> listGroupAppointments(String groupId) async {
+    final data = await client.rpc(
+      'list_group_appointments',
+      params: {'target_group_id': groupId},
+    );
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(Appointment.fromJson)
+        .toList();
+  }
+
+  /// 약속 상세 (후보 + 후보별 표 수 + 내 투표 플래그).
+  static Future<List<AppointmentCandidate>> getAppointmentDetail(
+    String appointmentId,
+  ) async {
+    final data = await client.rpc(
+      'get_appointment_detail',
+      params: {'target_appointment_id': appointmentId},
+    );
+    return (data as List)
+        .cast<Map<String, dynamic>>()
+        .map(AppointmentCandidate.fromJson)
+        .toList();
   }
 }
