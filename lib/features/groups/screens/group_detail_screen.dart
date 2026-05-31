@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../../models/appointment.dart';
 import '../../../models/friend.dart';
 import '../../../models/group.dart';
 import '../../../models/group_member.dart';
 import '../../../services/supabase_service.dart';
+import '../../appointments/providers/appointments_provider.dart';
+import '../../appointments/screens/appointment_create_screen.dart';
+import '../../appointments/screens/appointment_detail_screen.dart';
+import '../../appointments/widgets/appointment_card.dart';
 import '../../friends/providers/friends_provider.dart';
 import '../providers/groups_provider.dart';
 
@@ -18,6 +23,7 @@ class GroupDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final groupsAsync = ref.watch(groupsListProvider);
     final membersAsync = ref.watch(groupMembersProvider(groupId));
+    final appointmentsAsync = ref.watch(groupAppointmentsProvider(groupId));
 
     final group = groupsAsync.maybeWhen(
       data: (list) => list.where((g) => g.id == groupId).isEmpty
@@ -61,30 +67,27 @@ class GroupDetailScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(groupMembersProvider(groupId));
           ref.invalidate(groupsListProvider);
+          ref.invalidate(groupAppointmentsProvider(groupId));
         },
         child: membersAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('멤버를 불러올 수 없습니다: $e')),
           data: (members) {
-            return ListView.builder(
+            final showCta = group?.isOwner == true;
+            return ListView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: members.length + 1,
-              itemBuilder: (_, i) {
-                if (i == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Text(
-                      '멤버 ${members.length}명',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-                final m = members[i - 1];
-                return _MemberTile(member: m, group: group, groupId: groupId);
-              },
+              children: [
+                if (showCta) _NewAppointmentCard(group: group!),
+                ..._buildAppointmentSection(
+                  context,
+                  appointmentsAsync,
+                  members.length,
+                ),
+                _SectionHeader('멤버 ${members.length}명'),
+                for (final m in members)
+                  _MemberTile(member: m, group: group, groupId: groupId),
+              ],
             );
           },
         ),
@@ -96,6 +99,55 @@ class GroupDetailScreen extends ConsumerWidget {
               label: const Text('멤버 추가'),
             )
           : null,
+    );
+  }
+
+  /// 약속 섹션 빌더. 로딩 / 에러 / 빈 상태를 명시적으로 다룬다.
+  List<Widget> _buildAppointmentSection(
+    BuildContext context,
+    AsyncValue<List<Appointment>> appointmentsAsync,
+    int totalMemberCount,
+  ) {
+    return appointmentsAsync.when(
+      loading: () => [
+        const _SectionHeader('약속'),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: LinearProgressIndicator(minHeight: 2),
+        ),
+      ],
+      error: (e, _) => [
+        const _SectionHeader('약속'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+          child: Text(
+            '약속을 불러올 수 없습니다: $e',
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+      ],
+      data: (appointments) {
+        if (appointments.isEmpty) return const <Widget>[];
+        return [
+          _SectionHeader('약속 ${appointments.length}개'),
+          for (final a in appointments)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: AppointmentCard(
+                appointment: a,
+                totalMemberCount: totalMemberCount,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => AppointmentDetailScreen(
+                      appointmentId: a.id,
+                      groupId: groupId,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ];
+      },
     );
   }
 
@@ -493,3 +545,89 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
 }
 
 enum _MenuAction { rename, transfer, delete, leave }
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _NewAppointmentCard extends StatelessWidget {
+  const _NewAppointmentCard({required this.group});
+
+  final Group group;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        color: theme.colorScheme.primaryContainer,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => AppointmentCreateScreen(
+                  groupId: group.id,
+                  groupName: group.name,
+                ),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.event_outlined,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '새 약속 만들기',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '후보 2~5곳을 골라 멤버에게 투표 받기',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onPrimaryContainer
+                              .withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
